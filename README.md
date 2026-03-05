@@ -1,6 +1,6 @@
-# Agenticar Services Demo
+# Agenticar Services
 
-Interactive Next.js demo for:
+Interactive Next.js app for:
 - price estimate workflow
 - appointment scheduling workflow
 - mechanic queue + assistant chat workflow

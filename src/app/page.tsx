@@ -140,41 +140,25 @@ export default function Home() {
         },
       ]);
       setIsReplying(false);
-    }, 550);
+    }, 500);
   }
 
   return (
-    <main className="min-h-screen bg-[linear-gradient(180deg,#f7f9fc_0%,#eef2f8_100%)] px-4 py-5 text-slate-900 sm:px-6 lg:px-8">
+    <main className="min-h-screen bg-white px-4 py-5 text-black sm:px-6 lg:px-8">
       <div className="mx-auto flex max-w-7xl flex-col gap-5">
-        <header className="overflow-hidden rounded-[30px] border border-slate-200/70 bg-[linear-gradient(135deg,#0b1320_0%,#121f36_58%,#0a6a7d_100%)] px-6 py-7 text-white shadow-[0_24px_55px_rgba(2,6,23,0.2)] sm:px-8">
-          <div className="flex flex-wrap items-center justify-between gap-4">
-            <div>
-              <p className="text-xs uppercase tracking-[0.24em] text-cyan-200">
-                Agenticar Services
-              </p>
-              <h1 className="mt-2 text-3xl font-semibold sm:text-4xl">
-                Smart repair workflow
-              </h1>
-              <p className="mt-2 text-sm text-slate-300 sm:text-base">
-                Estimate, schedule, and mechanic operations in one flow.
-              </p>
-            </div>
-            <div className="grid grid-cols-3 gap-2">
-              <TopMetric label="Estimate" value={estimateStatus} />
-              <TopMetric
-                label="Slot"
-                value={
-                  estimateStatus === "approved"
-                    ? slots[selectedSlot].time
-                    : "Pending"
-                }
-              />
-              <TopMetric label="Queue" value="2 approved" />
-            </div>
-          </div>
+        <header className="rounded-[24px] border border-black bg-black px-6 py-8 text-white">
+          <p className="text-xs uppercase tracking-[0.22em] text-blue-300">
+            Agenticar Services
+          </p>
+          <h1 className="mt-2 text-4xl font-semibold leading-tight">
+            Precision repair workflow.
+          </h1>
+          <p className="mt-2 text-lg text-blue-100">
+            Quote. Schedule. Service.
+          </p>
         </header>
 
-        <section className="rounded-[28px] border border-slate-200/70 bg-white/90 p-2 shadow-[0_14px_36px_rgba(15,23,42,0.06)]">
+        <section className="rounded-[20px] border border-black/10 bg-white p-2">
           <div className="grid gap-2 md:grid-cols-3">
             {tabs.map((tab) => {
               const active = tab.id === activeTab;
@@ -183,10 +167,10 @@ export default function Home() {
                   key={tab.id}
                   type="button"
                   onClick={() => setActiveTab(tab.id)}
-                  className={`rounded-[20px] px-4 py-4 text-left transition ${
+                  className={`rounded-[14px] border px-4 py-3 text-left transition ${
                     active
-                      ? "bg-slate-950 text-white shadow-md"
-                      : "bg-white text-slate-600 hover:bg-slate-50"
+                      ? "border-black bg-black text-white"
+                      : "border-black/10 bg-white text-black hover:border-blue-500"
                   }`}
                 >
                   <p className="text-sm font-semibold">{tab.label}</p>
@@ -196,42 +180,38 @@ export default function Home() {
           </div>
         </section>
 
-        <section className="grid gap-5 lg:grid-cols-[1.2fr_0.8fr]">
-          <div className="rounded-[30px] border border-slate-200/70 bg-white p-6 shadow-[0_16px_40px_rgba(15,23,42,0.07)] sm:p-7">
+        <section className="grid gap-5 lg:grid-cols-[1.15fr_0.85fr]">
+          <div className="rounded-[24px] border border-black/10 bg-white p-6">
             {activeTab === "estimate" && (
               <div className="space-y-5">
-                <SectionTitle
-                  title="Generate Price Estimate"
-                  subtitle="Capture details and create an instant exterior estimate."
-                />
-
+                <SectionTitle title="Generate Price Estimate" />
                 <div className="grid gap-3 sm:grid-cols-2">
                   <Field
                     label="Customer"
                     value={ticket.customer}
                     onChange={(value) =>
-                      setTicket((c) => ({ ...c, customer: value }))
+                      setTicket((current) => ({ ...current, customer: value }))
                     }
                   />
                   <Field
                     label="Vehicle"
                     value={ticket.vehicle}
                     onChange={(value) =>
-                      setTicket((c) => ({ ...c, vehicle: value }))
+                      setTicket((current) => ({ ...current, vehicle: value }))
                     }
                   />
                   <Field
                     label="Mileage"
                     value={ticket.mileage}
                     onChange={(value) =>
-                      setTicket((c) => ({ ...c, mileage: value }))
+                      setTicket((current) => ({ ...current, mileage: value }))
                     }
                   />
                   <Field
                     label="Photos"
                     value={ticket.photos}
                     onChange={(value) =>
-                      setTicket((c) => ({ ...c, photos: value }))
+                      setTicket((current) => ({ ...current, photos: value }))
                     }
                   />
                 </div>
@@ -240,23 +220,25 @@ export default function Home() {
                   label="Symptoms"
                   value={ticket.symptoms}
                   textarea
-                  onChange={(value) => setTicket((c) => ({ ...c, symptoms: value }))}
+                  onChange={(value) =>
+                    setTicket((current) => ({ ...current, symptoms: value }))
+                  }
                 />
 
-                <div className="rounded-[24px] bg-slate-950 p-4 text-white">
-                  <p className="text-xs uppercase tracking-[0.2em] text-slate-400">
+                <div className="rounded-[18px] border border-blue-500/20 bg-blue-50 p-4">
+                  <p className="text-xs uppercase tracking-[0.16em] text-blue-700">
                     Estimate
                   </p>
-                  <p className="mt-1 text-3xl font-semibold">
+                  <p className="mt-1 text-3xl font-semibold text-black">
                     {estimateStatus === "draft" ? "--" : "$1,005"}
                   </p>
-                  <div className="mt-4 space-y-2">
+                  <div className="mt-3 space-y-2">
                     {lineItems.map((item) => (
                       <div
                         key={item.label}
-                        className="flex items-center justify-between rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm"
+                        className="flex items-center justify-between rounded-xl border border-black/10 bg-white px-3 py-2 text-sm"
                       >
-                        <span className="text-slate-300">{item.label}</span>
+                        <span className="text-black/70">{item.label}</span>
                         <span className="font-semibold">
                           {estimateStatus === "draft" ? "--" : item.value}
                         </span>
@@ -269,22 +251,19 @@ export default function Home() {
                   <PrimaryButton onClick={generateEstimate}>
                     Generate Estimate
                   </PrimaryButton>
-                  <GhostButton
+                  <SecondaryButton
                     onClick={approveEstimate}
                     disabled={estimateStatus !== "generated"}
                   >
                     Approve & Continue
-                  </GhostButton>
+                  </SecondaryButton>
                 </div>
               </div>
             )}
 
             {activeTab === "schedule" && (
               <div className="space-y-5">
-                <SectionTitle
-                  title="Schedule Appointment"
-                  subtitle="Route to the best available mechanic slot."
-                />
+                <SectionTitle title="Schedule Appointment" />
 
                 <div className="grid gap-3 sm:grid-cols-2">
                   <ModeCard
@@ -307,22 +286,16 @@ export default function Home() {
                         key={`${slot.date}-${slot.time}`}
                         type="button"
                         onClick={() => setSelectedSlot(index)}
-                        className={`w-full rounded-[18px] border px-4 py-3 text-left transition ${
+                        className={`w-full rounded-[14px] border px-4 py-3 text-left transition ${
                           active
-                            ? "border-slate-950 bg-slate-950 text-white"
-                            : "border-slate-200 bg-white hover:border-slate-400"
+                            ? "border-blue-500 bg-blue-50"
+                            : "border-black/10 bg-white hover:border-blue-500"
                         }`}
                       >
-                        <p className="font-semibold">
+                        <p className="font-semibold text-black">
                           {slot.date} · {slot.time}
                         </p>
-                        <p
-                          className={`text-sm ${
-                            active ? "text-slate-300" : "text-slate-500"
-                          }`}
-                        >
-                          {slot.mechanic}
-                        </p>
+                        <p className="text-sm text-black/60">{slot.mechanic}</p>
                       </button>
                     );
                   })}
@@ -336,12 +309,8 @@ export default function Home() {
 
             {activeTab === "mechanic" && (
               <div className="space-y-5">
-                <SectionTitle
-                  title="Mechanic Workspace"
-                  subtitle="Open approved requests and chat for repair support."
-                />
-
-                <div className="grid gap-4 xl:grid-cols-[0.8fr_1.2fr]">
+                <SectionTitle title="Mechanic Workspace" />
+                <div className="grid gap-4 xl:grid-cols-[0.85fr_1.15fr]">
                   <div className="space-y-2">
                     {jobs.map((job) => {
                       const active = selectedJobId === job.id;
@@ -350,17 +319,17 @@ export default function Home() {
                           key={job.id}
                           type="button"
                           onClick={() => selectJob(job.id)}
-                          className={`w-full rounded-[18px] border px-4 py-3 text-left transition ${
+                          className={`w-full rounded-[14px] border px-4 py-3 text-left transition ${
                             active
-                              ? "border-emerald-500 bg-emerald-50"
-                              : "border-slate-200 bg-white hover:border-slate-400"
+                              ? "border-blue-500 bg-blue-50"
+                              : "border-black/10 bg-white hover:border-blue-500"
                           }`}
                         >
-                          <p className="text-sm font-semibold text-slate-950">
+                          <p className="text-sm font-semibold text-black">
                             {job.id} · {job.customer}
                           </p>
-                          <p className="text-sm text-slate-600">{job.vehicle}</p>
-                          <p className="mt-1 text-xs text-slate-500">
+                          <p className="text-sm text-black/70">{job.vehicle}</p>
+                          <p className="text-xs text-black/50">
                             {job.issue} · {job.eta}
                           </p>
                         </button>
@@ -368,27 +337,27 @@ export default function Home() {
                     })}
                   </div>
 
-                  <div className="rounded-[22px] border border-slate-200 bg-slate-50 p-4">
-                    <p className="text-sm font-semibold text-slate-900">
+                  <div className="rounded-[18px] border border-black/10 bg-white p-4">
+                    <p className="text-sm font-semibold text-black">
                       {selectedJob.id} · {selectedJob.vehicle}
                     </p>
-                    <p className="text-sm text-slate-600">{selectedJob.issue}</p>
+                    <p className="text-sm text-black/60">{selectedJob.issue}</p>
 
-                    <div className="mt-4 h-64 space-y-2 overflow-y-auto rounded-[16px] bg-slate-950 p-3">
+                    <div className="mt-4 h-64 space-y-2 overflow-y-auto rounded-[14px] border border-black/10 bg-black p-3">
                       {chatMessages.map((message) => (
                         <div
                           key={message.id}
-                          className={`max-w-[84%] rounded-[14px] px-3 py-2 text-sm ${
+                          className={`max-w-[84%] rounded-[12px] px-3 py-2 text-sm ${
                             message.role === "assistant"
-                              ? "bg-white/10 text-slate-100"
-                              : "ml-auto bg-cyan-400 text-slate-950"
+                              ? "bg-white/10 text-white"
+                              : "ml-auto bg-blue-500 text-white"
                           }`}
                         >
                           {message.content}
                         </div>
                       ))}
                       {isReplying && (
-                        <div className="max-w-[84%] rounded-[14px] bg-white/10 px-3 py-2 text-sm text-slate-200">
+                        <div className="max-w-[84%] rounded-[12px] bg-white/10 px-3 py-2 text-sm text-white">
                           ...
                         </div>
                       )}
@@ -405,12 +374,12 @@ export default function Home() {
                           }
                         }}
                         placeholder="Ask a question"
-                        className="min-w-0 flex-1 rounded-[12px] border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-slate-900"
+                        className="min-w-0 flex-1 rounded-[10px] border border-black/20 bg-white px-3 py-2 text-sm outline-none focus:border-blue-500"
                       />
                       <button
                         type="button"
                         onClick={sendChat}
-                        className="rounded-[12px] bg-slate-950 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800"
+                        className="rounded-[10px] bg-black px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-600"
                       >
                         Send
                       </button>
@@ -422,9 +391,9 @@ export default function Home() {
           </div>
 
           <aside className="space-y-4">
-            <div className="rounded-[30px] border border-slate-200/70 bg-white p-5 shadow-[0_16px_40px_rgba(15,23,42,0.07)]">
-              <p className="text-xs uppercase tracking-[0.2em] text-slate-400">
-                Quick view
+            <div className="rounded-[24px] border border-black/10 bg-white p-5">
+              <p className="text-xs uppercase tracking-[0.18em] text-black/45">
+                Snapshot
               </p>
               <div className="mt-3 space-y-2">
                 <MiniStat label="Customer" value={ticket.customer} />
@@ -436,9 +405,9 @@ export default function Home() {
               </div>
             </div>
 
-            <div className="rounded-[30px] border border-slate-200/70 bg-white p-5 shadow-[0_16px_40px_rgba(15,23,42,0.07)]">
-              <p className="text-xs uppercase tracking-[0.2em] text-slate-400">
-                Outcomes
+            <div className="rounded-[24px] border border-blue-500/20 bg-blue-50 p-5">
+              <p className="text-xs uppercase tracking-[0.18em] text-blue-700">
+                KPI
               </p>
               <div className="mt-3 space-y-2">
                 <MetricRow label="Quote to booking" value="+18%" />
@@ -453,13 +422,8 @@ export default function Home() {
   );
 }
 
-function SectionTitle({ title, subtitle }: { title: string; subtitle: string }) {
-  return (
-    <div>
-      <h2 className="text-2xl font-semibold text-slate-950">{title}</h2>
-      <p className="mt-1 text-sm text-slate-500">{subtitle}</p>
-    </div>
-  );
+function SectionTitle({ title }: { title: string }) {
+  return <h2 className="text-2xl font-semibold text-black">{title}</h2>;
 }
 
 function Field({
@@ -473,24 +437,24 @@ function Field({
   onChange: (value: string) => void;
   textarea?: boolean;
 }) {
-  const cls =
-    "w-full rounded-[14px] border border-slate-200 bg-slate-50 px-3 py-2 text-sm outline-none focus:border-slate-900 focus:bg-white";
+  const className =
+    "w-full rounded-[10px] border border-black/15 bg-white px-3 py-2 text-sm outline-none focus:border-blue-500";
 
   return (
     <label className="block">
-      <span className="mb-1 block text-sm text-slate-600">{label}</span>
+      <span className="mb-1 block text-sm text-black/65">{label}</span>
       {textarea ? (
         <textarea
           rows={3}
           value={value}
           onChange={(event) => onChange(event.target.value)}
-          className={cls}
+          className={className}
         />
       ) : (
         <input
           value={value}
           onChange={(event) => onChange(event.target.value)}
-          className={cls}
+          className={className}
         />
       )}
     </label>
@@ -508,14 +472,14 @@ function PrimaryButton({
     <button
       type="button"
       onClick={onClick}
-      className="rounded-full bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800"
+      className="rounded-full bg-black px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-600"
     >
       {children}
     </button>
   );
 }
 
-function GhostButton({
+function SecondaryButton({
   children,
   onClick,
   disabled,
@@ -529,10 +493,10 @@ function GhostButton({
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className={`rounded-full border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-900 transition ${
+      className={`rounded-full border px-4 py-2.5 text-sm font-semibold transition ${
         disabled
-          ? "cursor-not-allowed opacity-40"
-          : "hover:border-slate-900 hover:bg-slate-50"
+          ? "cursor-not-allowed border-black/20 text-black/35"
+          : "border-black text-black hover:border-blue-500 hover:text-blue-600"
       }`}
     >
       {children}
@@ -553,10 +517,10 @@ function ModeCard({
     <button
       type="button"
       onClick={onClick}
-      className={`rounded-[18px] border px-4 py-4 text-left transition ${
+      className={`rounded-[14px] border px-4 py-3 text-left transition ${
         active
-          ? "border-slate-950 bg-slate-950 text-white"
-          : "border-slate-200 bg-white text-slate-700 hover:border-slate-400"
+          ? "border-blue-500 bg-blue-50 text-black"
+          : "border-black/10 bg-white text-black hover:border-blue-500"
       }`}
     >
       <p className="text-sm font-semibold">{title}</p>
@@ -564,33 +528,22 @@ function ModeCard({
   );
 }
 
-function TopMetric({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-xl border border-white/12 bg-white/10 px-3 py-2 text-center">
-      <p className="text-[11px] uppercase tracking-[0.14em] text-slate-300">
-        {label}
-      </p>
-      <p className="mt-1 text-sm font-semibold capitalize text-white">{value}</p>
-    </div>
-  );
-}
-
 function MiniStat({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-[14px] border border-slate-200 bg-slate-50 px-3 py-2">
-      <p className="text-[11px] uppercase tracking-[0.14em] text-slate-400">
+    <div className="rounded-[10px] border border-black/10 bg-white px-3 py-2">
+      <p className="text-[10px] uppercase tracking-[0.14em] text-black/45">
         {label}
       </p>
-      <p className="mt-1 text-sm font-medium text-slate-900">{value}</p>
+      <p className="mt-1 text-sm font-medium text-black">{value}</p>
     </div>
   );
 }
 
 function MetricRow({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex items-center justify-between rounded-[14px] border border-slate-200 bg-slate-50 px-3 py-2">
-      <p className="text-sm text-slate-600">{label}</p>
-      <p className="text-sm font-semibold text-slate-900">{value}</p>
+    <div className="flex items-center justify-between rounded-[10px] border border-blue-500/20 bg-white px-3 py-2">
+      <p className="text-sm text-black/70">{label}</p>
+      <p className="text-sm font-semibold text-black">{value}</p>
     </div>
   );
 }
