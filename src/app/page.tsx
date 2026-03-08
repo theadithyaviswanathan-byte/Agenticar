@@ -1,31 +1,45 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 
-type MainTab = "estimate" | "schedule" | "mechanic";
+type TopTab = "customer" | "service";
+type CustomerTab = "estimate" | "schedule";
+type ServiceTab = "pipeline" | "kpi";
 type EstimateStatus = "draft" | "generated" | "approved";
 type ScheduleMode = "calendar-sync" | "shop-availability";
-type ChatRole = "user" | "assistant";
 
 type Job = {
   id: string;
   customer: string;
   vehicle: string;
   issue: string;
-  status: "Approved" | "Scheduled";
+  status: "Approved" | "Scheduled" | "In Progress";
   eta: string;
 };
 
-type ChatMessage = {
+type ServiceSlot = {
   id: string;
-  role: ChatRole;
-  content: string;
+  mechanic: string;
+  primary: string;
+  alternates: string[];
+  recentVisits: number;
 };
 
-const tabs: { id: MainTab; label: string }[] = [
+type KpiMetric = {
+  label: string;
+  value: string;
+  delta: string;
+  series: number[];
+};
+
+const customerTabs: { id: CustomerTab; label: string }[] = [
   { id: "estimate", label: "Price Estimate" },
   { id: "schedule", label: "Schedule" },
-  { id: "mechanic", label: "Mechanic" },
+];
+
+const serviceTabs: { id: ServiceTab; label: string }[] = [
+  { id: "pipeline", label: "Service Pipeline" },
+  { id: "kpi", label: "KPIs" },
 ];
 
 const jobs: Job[] = [
@@ -34,7 +48,7 @@ const jobs: Job[] = [
     customer: "Maya Thompson",
     vehicle: "2019 Toyota RAV4 XLE",
     issue: "Front bumper scrape and brake pull",
-    status: "Approved",
+    status: "Scheduled",
     eta: "Tue 9:00 AM",
   },
   {
@@ -50,15 +64,33 @@ const jobs: Job[] = [
     customer: "Lauren Kim",
     vehicle: "2018 Subaru Outback",
     issue: "Bumper crack and sensor alert",
-    status: "Scheduled",
+    status: "In Progress",
     eta: "Wed 10:15 AM",
   },
 ];
 
-const slots = [
-  { date: "Tue, Mar 10", time: "9:00 AM", mechanic: "Marco Chen" },
-  { date: "Tue, Mar 10", time: "1:30 PM", mechanic: "Priya Shah" },
-  { date: "Wed, Mar 11", time: "10:15 AM", mechanic: "Jordan Lee" },
+const serviceSlots: ServiceSlot[] = [
+  {
+    id: "slot-1",
+    mechanic: "Marco Chen",
+    primary: "Tue, Mar 10 · 9:00 AM",
+    alternates: ["Tue, Mar 10 · 11:15 AM", "Wed, Mar 11 · 8:45 AM"],
+    recentVisits: 4,
+  },
+  {
+    id: "slot-2",
+    mechanic: "Priya Shah",
+    primary: "Tue, Mar 10 · 1:30 PM",
+    alternates: ["Wed, Mar 11 · 12:30 PM", "Thu, Mar 12 · 9:45 AM"],
+    recentVisits: 2,
+  },
+  {
+    id: "slot-3",
+    mechanic: "Jordan Lee",
+    primary: "Wed, Mar 11 · 10:15 AM",
+    alternates: ["Wed, Mar 11 · 2:00 PM", "Thu, Mar 12 · 11:00 AM"],
+    recentVisits: 1,
+  },
 ];
 
 const lineItems = [
@@ -68,24 +100,36 @@ const lineItems = [
   { label: "Labor + calibration", value: "$240" },
 ];
 
-const starterChat: ChatMessage[] = [
+const kpiMetrics: KpiMetric[] = [
   {
-    id: "assistant-1",
-    role: "assistant",
-    content: "How can I help with this repair?",
+    label: "Quote to booking",
+    value: "68%",
+    delta: "+18%",
+    series: [45, 49, 52, 56, 61, 64, 68],
+  },
+  {
+    label: "Avg intake time",
+    value: "14 min",
+    delta: "-12 min",
+    series: [31, 29, 26, 24, 20, 16, 14],
+  },
+  {
+    label: "Resolution speed",
+    value: "2.9 days",
+    delta: "-38%",
+    series: [4.9, 4.6, 4.2, 3.8, 3.5, 3.2, 2.9],
   },
 ];
 
 export default function Home() {
-  const [activeTab, setActiveTab] = useState<MainTab>("estimate");
+  const [activeTopTab, setActiveTopTab] = useState<TopTab>("customer");
+  const [activeCustomerTab, setActiveCustomerTab] =
+    useState<CustomerTab>("estimate");
+  const [activeServiceTab, setActiveServiceTab] = useState<ServiceTab>("pipeline");
   const [estimateStatus, setEstimateStatus] = useState<EstimateStatus>("draft");
   const [scheduleMode, setScheduleMode] =
     useState<ScheduleMode>("calendar-sync");
-  const [selectedSlot, setSelectedSlot] = useState(0);
-  const [selectedJobId, setSelectedJobId] = useState("AG-2038");
-  const [chatInput, setChatInput] = useState("");
-  const [chatMessages, setChatMessages] = useState<ChatMessage[]>(starterChat);
-  const [isReplying, setIsReplying] = useState(false);
+  const [selectedSlotId, setSelectedSlotId] = useState(serviceSlots[0].id);
   const [uploadedPhotos, setUploadedPhotos] = useState<File[]>([]);
   const [ticket, setTicket] = useState({
     customer: "Maya Thompson",
@@ -94,7 +138,15 @@ export default function Home() {
     symptoms: "Front bumper scrape, slight brake pull, dashboard warning.",
   });
 
-  const selectedJob = jobs.find((j) => j.id === selectedJobId) ?? jobs[0];
+  const preferredSupport = useMemo(
+    () =>
+      serviceSlots.reduce((top, slot) =>
+        slot.recentVisits > top.recentVisits ? slot : top,
+      ),
+    [],
+  );
+  const selectedSlot =
+    serviceSlots.find((slot) => slot.id === selectedSlotId) ?? serviceSlots[0];
 
   function generateEstimate() {
     setEstimateStatus("generated");
@@ -102,45 +154,12 @@ export default function Home() {
 
   function approveEstimate() {
     setEstimateStatus("approved");
-    setActiveTab("schedule");
+    setActiveCustomerTab("schedule");
   }
 
   function confirmAppointment() {
-    setActiveTab("mechanic");
-    setSelectedJobId("AG-2038");
-    setChatMessages(starterChat);
-    setChatInput("");
-    setIsReplying(false);
-  }
-
-  function selectJob(jobId: string) {
-    setSelectedJobId(jobId);
-    setChatMessages(starterChat);
-    setChatInput("");
-    setIsReplying(false);
-  }
-
-  function sendChat() {
-    if (!chatInput.trim() || isReplying) return;
-
-    setChatMessages((current) => [
-      ...current,
-      { id: `u-${Date.now()}`, role: "user", content: chatInput.trim() },
-    ]);
-    setChatInput("");
-    setIsReplying(true);
-
-    window.setTimeout(() => {
-      setChatMessages((current) => [
-        ...current,
-        {
-          id: `a-${Date.now()}`,
-          role: "assistant",
-          content: "Thank you for your query",
-        },
-      ]);
-      setIsReplying(false);
-    }, 500);
+    setActiveTopTab("service");
+    setActiveServiceTab("pipeline");
   }
 
   return (
@@ -159,257 +178,223 @@ export default function Home() {
         </header>
 
         <section className="rounded-[20px] border border-black/10 bg-white p-2">
-          <div className="grid gap-2 md:grid-cols-3">
-            {tabs.map((tab) => {
-              const active = tab.id === activeTab;
-              return (
-                <button
-                  key={tab.id}
-                  type="button"
-                  onClick={() => setActiveTab(tab.id)}
-                  className={`rounded-[14px] border px-4 py-3 text-left transition ${
-                    active
-                      ? "border-black bg-black text-white"
-                      : "border-black/10 bg-white text-black hover:border-blue-500"
-                  }`}
-                >
-                  <p className="text-sm font-semibold">{tab.label}</p>
-                </button>
-              );
-            })}
+          <div className="grid gap-2 sm:grid-cols-2">
+            <TabButton
+              label="Customer"
+              active={activeTopTab === "customer"}
+              onClick={() => setActiveTopTab("customer")}
+            />
+            <TabButton
+              label="Service Team"
+              active={activeTopTab === "service"}
+              onClick={() => setActiveTopTab("service")}
+            />
           </div>
         </section>
 
-        <section className="grid gap-5 lg:grid-cols-[1.15fr_0.85fr]">
+        <section className="grid gap-5 lg:grid-cols-[1.2fr_0.8fr]">
           <div className="rounded-[24px] border border-black/10 bg-white p-6">
-            {activeTab === "estimate" && (
+            {activeTopTab === "customer" && (
               <div className="space-y-5">
-                <SectionTitle title="Generate Price Estimate" />
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <Field
-                    label="Customer"
-                    value={ticket.customer}
-                    onChange={(value) =>
-                      setTicket((current) => ({ ...current, customer: value }))
-                    }
-                  />
-                  <Field
-                    label="Vehicle"
-                    value={ticket.vehicle}
-                    onChange={(value) =>
-                      setTicket((current) => ({ ...current, vehicle: value }))
-                    }
-                  />
-                  <Field
-                    label="Mileage"
-                    value={ticket.mileage}
-                    onChange={(value) =>
-                      setTicket((current) => ({ ...current, mileage: value }))
-                    }
-                  />
+                <div className="grid gap-2 sm:grid-cols-2">
+                  {customerTabs.map((tab) => (
+                    <TabButton
+                      key={tab.id}
+                      label={tab.label}
+                      active={activeCustomerTab === tab.id}
+                      onClick={() => setActiveCustomerTab(tab.id)}
+                    />
+                  ))}
                 </div>
 
-                <label className="block">
-                  <span className="mb-1 block text-sm text-black/65">Photos</span>
-                  <input
-                    type="file"
-                    accept="image/*"
-                    multiple
-                    onChange={(event) => {
-                      const files = event.target.files;
-                      setUploadedPhotos(files ? Array.from(files) : []);
-                    }}
-                    className="w-full rounded-[10px] border border-black/15 bg-white px-3 py-2 text-sm outline-none file:mr-3 file:rounded-full file:border-0 file:bg-black file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-white hover:file:bg-blue-600 focus:border-blue-500"
-                  />
-                  <p className="mt-2 text-xs text-black/55">
-                    {uploadedPhotos.length > 0
-                      ? `${uploadedPhotos.length} image${uploadedPhotos.length === 1 ? "" : "s"} selected`
-                      : "No images selected"}
-                  </p>
-                  {uploadedPhotos.length > 0 && (
-                    <ul className="mt-2 space-y-1 text-xs text-black/65">
-                      {uploadedPhotos.slice(0, 3).map((file) => (
-                        <li key={`${file.name}-${file.lastModified}`}>
-                          {file.name}
-                        </li>
-                      ))}
-                      {uploadedPhotos.length > 3 && (
-                        <li>+{uploadedPhotos.length - 3} more</li>
-                      )}
-                    </ul>
-                  )}
-                </label>
+                {activeCustomerTab === "estimate" && (
+                  <div className="space-y-5">
+                    <SectionTitle title="Generate Price Estimate" />
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <Field
+                        label="Customer"
+                        value={ticket.customer}
+                        onChange={(value) =>
+                          setTicket((current) => ({ ...current, customer: value }))
+                        }
+                      />
+                      <Field
+                        label="Vehicle"
+                        value={ticket.vehicle}
+                        onChange={(value) =>
+                          setTicket((current) => ({ ...current, vehicle: value }))
+                        }
+                      />
+                      <Field
+                        label="Mileage"
+                        value={ticket.mileage}
+                        onChange={(value) =>
+                          setTicket((current) => ({ ...current, mileage: value }))
+                        }
+                      />
+                    </div>
 
-                <Field
-                  label="Symptoms"
-                  value={ticket.symptoms}
-                  textarea
-                  onChange={(value) =>
-                    setTicket((current) => ({ ...current, symptoms: value }))
-                  }
-                />
+                    <label className="block">
+                      <span className="mb-1 block text-sm text-black/65">
+                        Photos
+                      </span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        multiple
+                        onChange={(event) => {
+                          const files = event.target.files;
+                          setUploadedPhotos(files ? Array.from(files) : []);
+                        }}
+                        className="w-full rounded-[10px] border border-black/15 bg-white px-3 py-2 text-sm outline-none file:mr-3 file:rounded-full file:border-0 file:bg-black file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-white hover:file:bg-blue-600 focus:border-blue-500"
+                      />
+                      <p className="mt-2 text-xs text-black/55">
+                        {uploadedPhotos.length > 0
+                          ? `${uploadedPhotos.length} image${uploadedPhotos.length === 1 ? "" : "s"} selected`
+                          : "No images selected"}
+                      </p>
+                    </label>
 
-                <div className="rounded-[18px] border border-blue-500/20 bg-blue-50 p-4">
-                  <p className="text-xs uppercase tracking-[0.16em] text-blue-700">
-                    Estimate
-                  </p>
-                  <p className="mt-1 text-3xl font-semibold text-black">
-                    {estimateStatus === "draft" ? "--" : "$1,005"}
-                  </p>
-                  <div className="mt-3 space-y-2">
-                    {lineItems.map((item) => (
-                      <div
-                        key={item.label}
-                        className="flex items-center justify-between rounded-xl border border-black/10 bg-white px-3 py-2 text-sm"
+                    <Field
+                      label="Symptoms"
+                      value={ticket.symptoms}
+                      textarea
+                      onChange={(value) =>
+                        setTicket((current) => ({ ...current, symptoms: value }))
+                      }
+                    />
+
+                    <EstimateCard estimateStatus={estimateStatus} />
+
+                    <div className="flex flex-wrap gap-2">
+                      <PrimaryButton onClick={generateEstimate}>
+                        Generate Estimate
+                      </PrimaryButton>
+                      <SecondaryButton
+                        onClick={approveEstimate}
+                        disabled={estimateStatus !== "generated"}
                       >
-                        <span className="text-black/70">{item.label}</span>
-                        <span className="font-semibold">
-                          {estimateStatus === "draft" ? "--" : item.value}
-                        </span>
-                      </div>
-                    ))}
+                        Approve & Continue
+                      </SecondaryButton>
+                    </div>
                   </div>
-                </div>
+                )}
 
-                <div className="flex flex-wrap gap-2">
-                  <PrimaryButton onClick={generateEstimate}>
-                    Generate Estimate
-                  </PrimaryButton>
-                  <SecondaryButton
-                    onClick={approveEstimate}
-                    disabled={estimateStatus !== "generated"}
-                  >
-                    Approve & Continue
-                  </SecondaryButton>
-                </div>
+                {activeCustomerTab === "schedule" && (
+                  <div className="space-y-5">
+                    <SectionTitle title="Schedule Appointment" />
+
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <ModeCard
+                        title="Calendar Sync"
+                        active={scheduleMode === "calendar-sync"}
+                        onClick={() => setScheduleMode("calendar-sync")}
+                      />
+                      <ModeCard
+                        title="Shop Availability"
+                        active={scheduleMode === "shop-availability"}
+                        onClick={() => setScheduleMode("shop-availability")}
+                      />
+                    </div>
+
+                    <p className="rounded-[12px] border border-blue-500/20 bg-blue-50 px-4 py-2 text-sm text-blue-800">
+                      These slots are based on current service team availability.
+                    </p>
+
+                    <div className="space-y-3">
+                      {serviceSlots.map((slot) => {
+                        const active = slot.id === selectedSlotId;
+                        const isPreferred = slot.mechanic === preferredSupport.mechanic;
+                        return (
+                          <button
+                            key={slot.id}
+                            type="button"
+                            onClick={() => setSelectedSlotId(slot.id)}
+                            className={`w-full rounded-[16px] border px-4 py-3 text-left transition ${
+                              active
+                                ? "border-blue-500 bg-blue-50"
+                                : "border-black/10 bg-white hover:border-blue-500"
+                            } ${isPreferred ? "border-2 border-black font-semibold" : ""}`}
+                          >
+                            <div className="flex items-center justify-between gap-3">
+                              <p className="text-base text-black">{slot.mechanic}</p>
+                              {isPreferred && (
+                                <span className="rounded-full bg-black px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-white">
+                                  Your preferred support
+                                </span>
+                              )}
+                            </div>
+                            <p className="mt-1 text-sm text-black/75">
+                              Primary: {slot.primary}
+                            </p>
+                            <p className="mt-1 text-xs text-black/55">
+                              Alternate slots: {slot.alternates.join(" • ")}
+                            </p>
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    <PrimaryButton onClick={confirmAppointment}>
+                      Confirm Appointment
+                    </PrimaryButton>
+                  </div>
+                )}
               </div>
             )}
 
-            {activeTab === "schedule" && (
+            {activeTopTab === "service" && (
               <div className="space-y-5">
-                <SectionTitle title="Schedule Appointment" />
-
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <ModeCard
-                    title="Calendar Sync"
-                    active={scheduleMode === "calendar-sync"}
-                    onClick={() => setScheduleMode("calendar-sync")}
-                  />
-                  <ModeCard
-                    title="Shop Availability"
-                    active={scheduleMode === "shop-availability"}
-                    onClick={() => setScheduleMode("shop-availability")}
-                  />
+                <div className="grid gap-2 sm:grid-cols-2">
+                  {serviceTabs.map((tab) => (
+                    <TabButton
+                      key={tab.id}
+                      label={tab.label}
+                      active={activeServiceTab === tab.id}
+                      onClick={() => setActiveServiceTab(tab.id)}
+                    />
+                  ))}
                 </div>
 
-                <div className="space-y-2">
-                  {slots.map((slot, index) => {
-                    const active = selectedSlot === index;
-                    return (
-                      <button
-                        key={`${slot.date}-${slot.time}`}
-                        type="button"
-                        onClick={() => setSelectedSlot(index)}
-                        className={`w-full rounded-[14px] border px-4 py-3 text-left transition ${
-                          active
-                            ? "border-blue-500 bg-blue-50"
-                            : "border-black/10 bg-white hover:border-blue-500"
-                        }`}
-                      >
-                        <p className="font-semibold text-black">
-                          {slot.date} · {slot.time}
-                        </p>
-                        <p className="text-sm text-black/60">{slot.mechanic}</p>
-                      </button>
-                    );
-                  })}
-                </div>
-
-                <PrimaryButton onClick={confirmAppointment}>
-                  Confirm Appointment
-                </PrimaryButton>
-              </div>
-            )}
-
-            {activeTab === "mechanic" && (
-              <div className="space-y-5">
-                <SectionTitle title="Mechanic Workspace" />
-                <div className="grid gap-4 xl:grid-cols-[0.85fr_1.15fr]">
-                  <div className="space-y-2">
-                    {jobs.map((job) => {
-                      const active = selectedJobId === job.id;
-                      return (
-                        <button
+                {activeServiceTab === "pipeline" && (
+                  <div className="space-y-4">
+                    <SectionTitle title="Service Pipeline" />
+                    <p className="text-sm text-black/60">
+                      Customers up next based on approved estimates and booked
+                      availability.
+                    </p>
+                    <div className="space-y-2">
+                      {jobs.map((job) => (
+                        <div
                           key={job.id}
-                          type="button"
-                          onClick={() => selectJob(job.id)}
-                          className={`w-full rounded-[14px] border px-4 py-3 text-left transition ${
-                            active
-                              ? "border-blue-500 bg-blue-50"
-                              : "border-black/10 bg-white hover:border-blue-500"
-                          }`}
+                          className="rounded-[14px] border border-black/10 bg-white px-4 py-3"
                         >
-                          <p className="text-sm font-semibold text-black">
-                            {job.id} · {job.customer}
-                          </p>
+                          <div className="flex items-center justify-between gap-3">
+                            <p className="text-sm font-semibold text-black">
+                              {job.id} · {job.customer}
+                            </p>
+                            <StatusPill status={job.status} />
+                          </div>
                           <p className="text-sm text-black/70">{job.vehicle}</p>
                           <p className="text-xs text-black/50">
                             {job.issue} · {job.eta}
                           </p>
-                        </button>
-                      );
-                    })}
-                  </div>
-
-                  <div className="rounded-[18px] border border-black/10 bg-white p-4">
-                    <p className="text-sm font-semibold text-black">
-                      {selectedJob.id} · {selectedJob.vehicle}
-                    </p>
-                    <p className="text-sm text-black/60">{selectedJob.issue}</p>
-
-                    <div className="mt-4 h-64 space-y-2 overflow-y-auto rounded-[14px] border border-black/10 bg-black p-3">
-                      {chatMessages.map((message) => (
-                        <div
-                          key={message.id}
-                          className={`max-w-[84%] rounded-[12px] px-3 py-2 text-sm ${
-                            message.role === "assistant"
-                              ? "bg-white/10 text-white"
-                              : "ml-auto bg-blue-500 text-white"
-                          }`}
-                        >
-                          {message.content}
                         </div>
                       ))}
-                      {isReplying && (
-                        <div className="max-w-[84%] rounded-[12px] bg-white/10 px-3 py-2 text-sm text-white">
-                          ...
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="mt-3 flex gap-2">
-                      <input
-                        value={chatInput}
-                        onChange={(event) => setChatInput(event.target.value)}
-                        onKeyDown={(event) => {
-                          if (event.key === "Enter") {
-                            event.preventDefault();
-                            sendChat();
-                          }
-                        }}
-                        placeholder="Ask a question"
-                        className="min-w-0 flex-1 rounded-[10px] border border-black/20 bg-white px-3 py-2 text-sm outline-none focus:border-blue-500"
-                      />
-                      <button
-                        type="button"
-                        onClick={sendChat}
-                        className="rounded-[10px] bg-black px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-600"
-                      >
-                        Send
-                      </button>
                     </div>
                   </div>
-                </div>
+                )}
+
+                {activeServiceTab === "kpi" && (
+                  <div className="space-y-4">
+                    <SectionTitle title="Service Team KPIs" />
+                    <div className="grid gap-3">
+                      {kpiMetrics.map((metric) => (
+                        <KpiCard key={metric.label} metric={metric} />
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -422,21 +407,8 @@ export default function Home() {
               <div className="mt-3 space-y-2">
                 <MiniStat label="Customer" value={ticket.customer} />
                 <MiniStat label="Vehicle" value={ticket.vehicle} />
-                <MiniStat
-                  label="Selected slot"
-                  value={`${slots[selectedSlot].date} ${slots[selectedSlot].time}`}
-                />
-              </div>
-            </div>
-
-            <div className="rounded-[24px] border border-blue-500/20 bg-blue-50 p-5">
-              <p className="text-xs uppercase tracking-[0.18em] text-blue-700">
-                KPI
-              </p>
-              <div className="mt-3 space-y-2">
-                <MetricRow label="Quote to booking" value="+18%" />
-                <MetricRow label="Intake time" value="-12 min" />
-                <MetricRow label="Resolution speed" value="-38%" />
+                <MiniStat label="Selected support" value={selectedSlot.mechanic} />
+                <MiniStat label="Booked slot" value={selectedSlot.primary} />
               </div>
             </div>
           </aside>
@@ -448,6 +420,30 @@ export default function Home() {
 
 function SectionTitle({ title }: { title: string }) {
   return <h2 className="text-2xl font-semibold text-black">{title}</h2>;
+}
+
+function TabButton({
+  label,
+  active,
+  onClick,
+}: {
+  label: string;
+  active: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`rounded-[14px] border px-4 py-3 text-left transition ${
+        active
+          ? "border-black bg-black text-white"
+          : "border-black/10 bg-white text-black hover:border-blue-500"
+      }`}
+    >
+      <p className="text-sm font-semibold">{label}</p>
+    </button>
+  );
 }
 
 function Field({
@@ -485,11 +481,35 @@ function Field({
   );
 }
 
+function EstimateCard({ estimateStatus }: { estimateStatus: EstimateStatus }) {
+  return (
+    <div className="rounded-[18px] border border-blue-500/20 bg-blue-50 p-4">
+      <p className="text-xs uppercase tracking-[0.16em] text-blue-700">Estimate</p>
+      <p className="mt-1 text-3xl font-semibold text-black">
+        {estimateStatus === "draft" ? "--" : "$1,005"}
+      </p>
+      <div className="mt-3 space-y-2">
+        {lineItems.map((item) => (
+          <div
+            key={item.label}
+            className="flex items-center justify-between rounded-xl border border-black/10 bg-white px-3 py-2 text-sm"
+          >
+            <span className="text-black/70">{item.label}</span>
+            <span className="font-semibold">
+              {estimateStatus === "draft" ? "--" : item.value}
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function PrimaryButton({
   children,
   onClick,
 }: {
-  children: React.ReactNode;
+  children: ReactNode;
   onClick: () => void;
 }) {
   return (
@@ -508,7 +528,7 @@ function SecondaryButton({
   onClick,
   disabled,
 }: {
-  children: React.ReactNode;
+  children: ReactNode;
   onClick: () => void;
   disabled?: boolean;
 }) {
@@ -552,6 +572,52 @@ function ModeCard({
   );
 }
 
+function StatusPill({ status }: { status: Job["status"] }) {
+  const className =
+    status === "In Progress"
+      ? "bg-amber-50 text-amber-800 border-amber-200"
+      : status === "Scheduled"
+        ? "bg-blue-50 text-blue-700 border-blue-200"
+        : "bg-emerald-50 text-emerald-700 border-emerald-200";
+  return (
+    <span className={`rounded-full border px-2.5 py-1 text-xs ${className}`}>
+      {status}
+    </span>
+  );
+}
+
+function KpiCard({ metric }: { metric: KpiMetric }) {
+  const min = Math.min(...metric.series);
+  const max = Math.max(...metric.series);
+  const range = max - min || 1;
+
+  return (
+    <div className="rounded-[16px] border border-blue-500/20 bg-blue-50 p-4">
+      <div className="flex items-end justify-between gap-2">
+        <div>
+          <p className="text-xs uppercase tracking-[0.14em] text-blue-700">
+            {metric.label}
+          </p>
+          <p className="mt-1 text-2xl font-semibold text-black">{metric.value}</p>
+        </div>
+        <p className="text-sm font-semibold text-blue-700">{metric.delta}</p>
+      </div>
+      <div className="mt-3 flex h-20 items-end gap-1.5">
+        {metric.series.map((point, index) => {
+          const height = 20 + ((point - min) / range) * 60;
+          return (
+            <div
+              key={`${metric.label}-${index}`}
+              className="flex-1 rounded-t-sm bg-blue-500/75"
+              style={{ height: `${height}%` }}
+            />
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 function MiniStat({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-[10px] border border-black/10 bg-white px-3 py-2">
@@ -559,15 +625,6 @@ function MiniStat({ label, value }: { label: string; value: string }) {
         {label}
       </p>
       <p className="mt-1 text-sm font-medium text-black">{value}</p>
-    </div>
-  );
-}
-
-function MetricRow({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex items-center justify-between rounded-[10px] border border-blue-500/20 bg-white px-3 py-2">
-      <p className="text-sm text-black/70">{label}</p>
-      <p className="text-sm font-semibold text-black">{value}</p>
     </div>
   );
 }
