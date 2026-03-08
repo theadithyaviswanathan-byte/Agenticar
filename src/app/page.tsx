@@ -1,17 +1,19 @@
 "use client";
 
-import {
-  useMemo,
-  useState,
-  type FormEvent,
-  type ReactNode,
-} from "react";
+import { useMemo, useState, type FormEvent, type ReactNode } from "react";
 
-type TopTab = "customer" | "service";
+type UserRole = "customer" | "mechanic";
 type CustomerTab = "estimate" | "schedule";
 type ServiceTab = "pipeline" | "kpi";
 type EstimateStatus = "draft" | "generated" | "approved";
 type ScheduleMode = "calendar-sync" | "shop-availability";
+type ChatRole = "user" | "assistant";
+
+type ChatMessage = {
+  id: string;
+  role: ChatRole;
+  content: string;
+};
 
 type Job = {
   id: string;
@@ -20,6 +22,11 @@ type Job = {
   issue: string;
   status: "Approved" | "Scheduled" | "In Progress";
   eta: string;
+  summary: {
+    priorIssue: string;
+    modelPattern: string;
+    note: string;
+  };
 };
 
 type ServiceSlot = {
@@ -55,6 +62,13 @@ const jobs: Job[] = [
     issue: "Front bumper scrape and brake pull",
     status: "Scheduled",
     eta: "Tue 9:00 AM",
+    summary: {
+      priorIssue:
+        "One similar brake-pull complaint was logged 8 months ago and resolved by caliper realignment.",
+      modelPattern:
+        "Minor bumper bracket damage after low-speed front impacts is common in 2019 RAV4 urban driving claims.",
+      note: "Tire wear trend is slightly uneven on front-right; suggest alignment check during service.",
+    },
   },
   {
     id: "AG-2041",
@@ -63,6 +77,12 @@ const jobs: Job[] = [
     issue: "Rear quarter panel dent",
     status: "Approved",
     eta: "Tue 1:30 PM",
+    summary: {
+      priorIssue: "No prior dent history for this customer in the last 24 months.",
+      modelPattern:
+        "This repair is typically isolated cosmetic damage and not a recurring structural pattern for this model.",
+      note: "Public resale data suggests clean panel blending helps preserve valuation for this trim.",
+    },
   },
   {
     id: "AG-2044",
@@ -71,6 +91,13 @@ const jobs: Job[] = [
     issue: "Bumper crack and sensor alert",
     status: "In Progress",
     eta: "Wed 10:15 AM",
+    summary: {
+      priorIssue:
+        "Two prior sensor recalibrations were performed in the last year after rear bumper impacts.",
+      modelPattern:
+        "Parking sensor alert recurrence after bumper replacement is a known post-repair calibration risk in this model year.",
+      note: "Agent recommends validating firmware version before final sensor calibration.",
+    },
   },
 ];
 
@@ -126,12 +153,21 @@ const kpiMetrics: KpiMetric[] = [
   },
 ];
 
+const starterChat: ChatMessage[] = [
+  {
+    id: "assistant-1",
+    role: "assistant",
+    content: "RAG agent connected. Ask me about parts, history, or likely root causes.",
+  },
+];
+
 export default function Home() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [userRole, setUserRole] = useState<UserRole>("customer");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [loginError, setLoginError] = useState("");
-  const [activeTopTab, setActiveTopTab] = useState<TopTab>("customer");
+  const [isMechanicRevealLoading, setIsMechanicRevealLoading] = useState(false);
   const [activeCustomerTab, setActiveCustomerTab] =
     useState<CustomerTab>("estimate");
   const [activeServiceTab, setActiveServiceTab] = useState<ServiceTab>("pipeline");
@@ -142,6 +178,12 @@ export default function Home() {
   const [isScheduleLoading, setIsScheduleLoading] = useState(false);
   const [selectedSlotId, setSelectedSlotId] = useState(serviceSlots[0].id);
   const [uploadedPhotos, setUploadedPhotos] = useState<File[]>([]);
+  const [selectedJobId, setSelectedJobId] = useState(jobs[0].id);
+  const [isResearching, setIsResearching] = useState(false);
+  const [showResearchSummary, setShowResearchSummary] = useState(false);
+  const [chatInput, setChatInput] = useState("");
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>(starterChat);
+  const [isReplying, setIsReplying] = useState(false);
   const [ticket, setTicket] = useState({
     customer: "Maya Thompson",
     vehicle: "2019 Toyota RAV4 XLE",
@@ -158,6 +200,7 @@ export default function Home() {
   );
   const selectedSlot =
     serviceSlots.find((slot) => slot.id === selectedSlotId) ?? serviceSlots[0];
+  const selectedJob = jobs.find((job) => job.id === selectedJobId) ?? jobs[0];
 
   function startScheduleLoading() {
     setIsScheduleLoading(true);
@@ -166,14 +209,44 @@ export default function Home() {
     }, 1600);
   }
 
+  function runResearchFlow() {
+    setIsResearching(true);
+    setShowResearchSummary(false);
+    window.setTimeout(() => {
+      setIsResearching(false);
+      setShowResearchSummary(true);
+    }, 2300);
+  }
+
   function signIn(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!username.trim() || !password.trim()) {
-      setLoginError("Enter any username and password to continue.");
+      setLoginError("Enter your username and password.");
       return;
     }
+
+    const normalized = username.trim().toLowerCase();
+    if (normalized !== "customer" && normalized !== "mechanic") {
+      setLoginError('Use "customer" or "mechanic" as username for this demo.');
+      return;
+    }
+
+    const nextRole = normalized as UserRole;
+    setUserRole(nextRole);
     setLoginError("");
     setIsLoggedIn(true);
+
+    if (nextRole === "mechanic") {
+      setIsMechanicRevealLoading(true);
+      window.setTimeout(() => {
+        setIsMechanicRevealLoading(false);
+      }, 1500);
+      runResearchFlow();
+    }
+
+    if (nextRole === "customer") {
+      setActiveCustomerTab("estimate");
+    }
   }
 
   function generateEstimate() {
@@ -194,8 +267,39 @@ export default function Home() {
   }
 
   function confirmAppointment() {
-    setActiveTopTab("service");
-    setActiveServiceTab("pipeline");
+    setEstimateStatus("approved");
+  }
+
+  function selectJob(jobId: string) {
+    setSelectedJobId(jobId);
+    setChatMessages(starterChat);
+    setChatInput("");
+    setIsReplying(false);
+    runResearchFlow();
+  }
+
+  function sendChat() {
+    if (!chatInput.trim() || isReplying) return;
+
+    setChatMessages((current) => [
+      ...current,
+      { id: `u-${Date.now()}`, role: "user", content: chatInput.trim() },
+    ]);
+    setChatInput("");
+    setIsReplying(true);
+
+    window.setTimeout(() => {
+      setChatMessages((current) => [
+        ...current,
+        {
+          id: `a-${Date.now()}`,
+          role: "assistant",
+          content:
+            "Checking service records and external references. I recommend inspecting alignment and recalibration sequence first.",
+        },
+      ]);
+      setIsReplying(false);
+    }, 700);
   }
 
   if (!isLoggedIn) {
@@ -207,7 +311,8 @@ export default function Home() {
           </p>
           <h1 className="mt-2 text-3xl font-semibold leading-tight">Sign in</h1>
           <p className="mt-2 text-sm text-black/65">
-            Enter any username and password to continue.
+            Use username <span className="font-semibold">customer</span> or{" "}
+            <span className="font-semibold">mechanic</span>.
           </p>
           <form onSubmit={signIn} className="mt-5 space-y-4">
             <label className="block">
@@ -240,6 +345,26 @@ export default function Home() {
     );
   }
 
+  if (userRole === "mechanic" && isMechanicRevealLoading) {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-white px-4 py-8 text-black">
+        <section className="w-full max-w-2xl rounded-[24px] border border-blue-500/20 bg-blue-50 p-7">
+          <p className="text-xs uppercase tracking-[0.2em] text-blue-700">
+            Service Centre
+          </p>
+          <h1 className="mt-2 text-3xl font-semibold">Hey Adi, Welcome back</h1>
+          <p className="mt-2 text-sm text-blue-900/80">
+            Your agent is ready, focused on your next customer.
+          </p>
+          <div className="mt-4 flex items-center gap-2 text-sm text-blue-800">
+            <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-blue-700/25 border-t-blue-700" />
+            Revealing your service pipeline...
+          </div>
+        </section>
+      </main>
+    );
+  }
+
   return (
     <main className="min-h-screen bg-white px-4 py-5 text-black sm:px-6 lg:px-8">
       <div className="mx-auto flex max-w-7xl flex-col gap-5">
@@ -255,24 +380,9 @@ export default function Home() {
           </p>
         </header>
 
-        <section className="rounded-[20px] border border-black/10 bg-white p-2">
-          <div className="grid gap-2 sm:grid-cols-2">
-            <TabButton
-              label="Customer"
-              active={activeTopTab === "customer"}
-              onClick={() => setActiveTopTab("customer")}
-            />
-            <TabButton
-              label="Service Team"
-              active={activeTopTab === "service"}
-              onClick={() => setActiveTopTab("service")}
-            />
-          </div>
-        </section>
-
-        <section className="grid gap-5 lg:grid-cols-[1.2fr_0.8fr]">
-          <div className="rounded-[24px] border border-black/10 bg-white p-6">
-            {activeTopTab === "customer" && (
+        {userRole === "customer" && (
+          <section className="grid gap-5 lg:grid-cols-[1.2fr_0.8fr]">
+            <div className="rounded-[24px] border border-black/10 bg-white p-6">
               <div className="space-y-5">
                 <div className="grid gap-2 sm:grid-cols-2">
                   {customerTabs.map((tab) => (
@@ -282,9 +392,7 @@ export default function Home() {
                       active={activeCustomerTab === tab.id}
                       onClick={() => {
                         setActiveCustomerTab(tab.id);
-                        if (tab.id === "schedule") {
-                          startScheduleLoading();
-                        }
+                        if (tab.id === "schedule") startScheduleLoading();
                       }}
                     />
                   ))}
@@ -449,10 +557,34 @@ export default function Home() {
                   </div>
                 )}
               </div>
-            )}
+            </div>
 
-            {activeTopTab === "service" && (
+            <aside className="space-y-4">
+              <div className="rounded-[24px] border border-black/10 bg-white p-5">
+                <p className="text-xs uppercase tracking-[0.18em] text-black/45">
+                  Snapshot
+                </p>
+                <div className="mt-3 space-y-2">
+                  <MiniStat label="Customer" value={ticket.customer} />
+                  <MiniStat label="Vehicle" value={ticket.vehicle} />
+                  <MiniStat label="Selected support" value={selectedSlot.mechanic} />
+                  <MiniStat label="Booked slot" value={selectedSlot.primary} />
+                </div>
+              </div>
+            </aside>
+          </section>
+        )}
+
+        {userRole === "mechanic" && (
+          <section className="grid gap-5 lg:grid-cols-[1.25fr_0.75fr]">
+            <div className="rounded-[24px] border border-black/10 bg-white p-6">
               <div className="space-y-5">
+                <div className="rounded-[16px] border border-blue-500/20 bg-blue-50 px-4 py-3">
+                  <p className="text-sm font-semibold text-blue-900">
+                    Your agent is ready, focused on your next customer.
+                  </p>
+                </div>
+
                 <div className="grid gap-2 sm:grid-cols-2">
                   {serviceTabs.map((tab) => (
                     <TabButton
@@ -467,28 +599,130 @@ export default function Home() {
                 {activeServiceTab === "pipeline" && (
                   <div className="space-y-4">
                     <SectionTitle title="Service Pipeline" />
-                    <p className="text-sm text-black/60">
-                      Customers up next based on approved estimates and booked
-                      availability.
-                    </p>
-                    <div className="space-y-2">
-                      {jobs.map((job) => (
-                        <div
-                          key={job.id}
-                          className="rounded-[14px] border border-black/10 bg-white px-4 py-3"
-                        >
-                          <div className="flex items-center justify-between gap-3">
-                            <p className="text-sm font-semibold text-black">
-                              {job.id} · {job.customer}
-                            </p>
-                            <StatusPill status={job.status} />
-                          </div>
-                          <p className="text-sm text-black/70">{job.vehicle}</p>
-                          <p className="text-xs text-black/50">
-                            {job.issue} · {job.eta}
+                    <div className="grid gap-4 xl:grid-cols-[0.8fr_1.2fr]">
+                      <div className="space-y-2">
+                        {jobs.map((job) => {
+                          const active = selectedJobId === job.id;
+                          return (
+                            <button
+                              key={job.id}
+                              type="button"
+                              onClick={() => selectJob(job.id)}
+                              className={`w-full rounded-[14px] border px-4 py-3 text-left transition ${
+                                active
+                                  ? "border-blue-500 bg-blue-50"
+                                  : "border-black/10 bg-white hover:border-blue-500"
+                              }`}
+                            >
+                              <p className="text-sm font-semibold text-black">
+                                {job.id} · {job.customer}
+                              </p>
+                              <p className="text-sm text-black/70">{job.vehicle}</p>
+                              <p className="text-xs text-black/50">
+                                {job.issue} · {job.eta}
+                              </p>
+                            </button>
+                          );
+                        })}
+                      </div>
+
+                      <div className="space-y-3 rounded-[18px] border border-black/10 bg-white p-4">
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="text-sm font-semibold text-black">
+                            {selectedJob.id} · {selectedJob.customer}
                           </p>
+                          <StatusPill status={selectedJob.status} />
                         </div>
-                      ))}
+                        <p className="text-sm text-black/65">
+                          {selectedJob.vehicle} · {selectedJob.issue}
+                        </p>
+
+                        <div className="rounded-[12px] border border-black/10 bg-black px-3 py-2 text-xs uppercase tracking-[0.12em] text-blue-200">
+                          Chat connected with RAG
+                        </div>
+
+                        <div className="h-44 space-y-2 overflow-y-auto rounded-[14px] border border-black/10 bg-black p-3">
+                          {chatMessages.map((message) => (
+                            <div
+                              key={message.id}
+                              className={`max-w-[86%] rounded-[12px] px-3 py-2 text-sm ${
+                                message.role === "assistant"
+                                  ? "bg-white/10 text-white"
+                                  : "ml-auto bg-blue-500 text-white"
+                              }`}
+                            >
+                              {message.content}
+                            </div>
+                          ))}
+                          {isReplying && (
+                            <div className="max-w-[86%] rounded-[12px] bg-white/10 px-3 py-2 text-sm text-white">
+                              ...
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="flex gap-2">
+                          <input
+                            value={chatInput}
+                            onChange={(event) => setChatInput(event.target.value)}
+                            onKeyDown={(event) => {
+                              if (event.key === "Enter") {
+                                event.preventDefault();
+                                sendChat();
+                              }
+                            }}
+                            placeholder="Ask the agent"
+                            className="min-w-0 flex-1 rounded-[10px] border border-black/20 bg-white px-3 py-2 text-sm outline-none focus:border-blue-500"
+                          />
+                          <button
+                            type="button"
+                            onClick={sendChat}
+                            className="rounded-[10px] bg-black px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-600"
+                          >
+                            Send
+                          </button>
+                        </div>
+
+                        <div className="rounded-[14px] border border-blue-500/20 bg-blue-50 px-4 py-3 text-sm text-blue-900">
+                          {isResearching ? (
+                            <div className="flex items-center gap-2">
+                              <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-blue-700/25 border-t-blue-700" />
+                              your agent is researching car history and also
+                              public information on anything you need to know
+                            </div>
+                          ) : (
+                            <p className="font-semibold">
+                              Agent research completed for this customer.
+                            </p>
+                          )}
+                        </div>
+
+                        {showResearchSummary && (
+                          <div className="space-y-2 rounded-[14px] border border-black/10 bg-white px-4 py-3 text-sm">
+                            <p className="font-semibold text-black">
+                              Agent Summary
+                            </p>
+                            <p className="text-black/75">
+                              <span className="font-semibold">
+                                Prior occurrence:
+                              </span>{" "}
+                              {selectedJob.summary.priorIssue}
+                            </p>
+                            <p className="text-black/75">
+                              <span className="font-semibold">
+                                Make/model pattern:
+                              </span>{" "}
+                              {selectedJob.summary.modelPattern}
+                            </p>
+                            <p className="text-black/75">
+                              <span className="font-semibold">
+                                Interesting note:
+                              </span>{" "}
+                              {selectedJob.summary.note}
+                            </p>
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </div>
                 )}
@@ -504,23 +738,23 @@ export default function Home() {
                   </div>
                 )}
               </div>
-            )}
-          </div>
-
-          <aside className="space-y-4">
-            <div className="rounded-[24px] border border-black/10 bg-white p-5">
-              <p className="text-xs uppercase tracking-[0.18em] text-black/45">
-                Snapshot
-              </p>
-              <div className="mt-3 space-y-2">
-                <MiniStat label="Customer" value={ticket.customer} />
-                <MiniStat label="Vehicle" value={ticket.vehicle} />
-                <MiniStat label="Selected support" value={selectedSlot.mechanic} />
-                <MiniStat label="Booked slot" value={selectedSlot.primary} />
-              </div>
             </div>
-          </aside>
-        </section>
+
+            <aside className="space-y-4">
+              <div className="rounded-[24px] border border-black/10 bg-white p-5">
+                <p className="text-xs uppercase tracking-[0.18em] text-black/45">
+                  Mechanic Snapshot
+                </p>
+                <div className="mt-3 space-y-2">
+                  <MiniStat label="Next customer" value={selectedJob.customer} />
+                  <MiniStat label="Vehicle" value={selectedJob.vehicle} />
+                  <MiniStat label="Status" value={selectedJob.status} />
+                  <MiniStat label="ETA" value={selectedJob.eta} />
+                </div>
+              </div>
+            </aside>
+          </section>
+        )}
       </div>
     </main>
   );
