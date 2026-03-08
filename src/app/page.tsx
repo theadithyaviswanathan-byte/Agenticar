@@ -1,6 +1,11 @@
 "use client";
 
-import { useMemo, useState, type FormEvent, type ReactNode } from "react";
+import {
+  useMemo,
+  useState,
+  type FormEvent,
+  type ReactNode,
+} from "react";
 
 type TopTab = "customer" | "service";
 type CustomerTab = "estimate" | "schedule";
@@ -134,6 +139,7 @@ export default function Home() {
   const [isGeneratingEstimate, setIsGeneratingEstimate] = useState(false);
   const [scheduleMode, setScheduleMode] =
     useState<ScheduleMode>("calendar-sync");
+  const [isScheduleLoading, setIsScheduleLoading] = useState(false);
   const [selectedSlotId, setSelectedSlotId] = useState(serviceSlots[0].id);
   const [uploadedPhotos, setUploadedPhotos] = useState<File[]>([]);
   const [ticket, setTicket] = useState({
@@ -152,6 +158,13 @@ export default function Home() {
   );
   const selectedSlot =
     serviceSlots.find((slot) => slot.id === selectedSlotId) ?? serviceSlots[0];
+
+  function startScheduleLoading() {
+    setIsScheduleLoading(true);
+    window.setTimeout(() => {
+      setIsScheduleLoading(false);
+    }, 1600);
+  }
 
   function signIn(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -177,6 +190,7 @@ export default function Home() {
   function approveEstimate() {
     setEstimateStatus("approved");
     setActiveCustomerTab("schedule");
+    startScheduleLoading();
   }
 
   function confirmAppointment() {
@@ -266,7 +280,12 @@ export default function Home() {
                       key={tab.id}
                       label={tab.label}
                       active={activeCustomerTab === tab.id}
-                      onClick={() => setActiveCustomerTab(tab.id)}
+                      onClick={() => {
+                        setActiveCustomerTab(tab.id);
+                        if (tab.id === "schedule") {
+                          startScheduleLoading();
+                        }
+                      }}
                     />
                   ))}
                 </div>
@@ -356,61 +375,77 @@ export default function Home() {
                   <div className="space-y-5">
                     <SectionTitle title="Schedule Appointment" />
 
-                    <div className="grid gap-3 sm:grid-cols-2">
-                      <ModeCard
-                        title="Calendar Sync"
-                        active={scheduleMode === "calendar-sync"}
-                        onClick={() => setScheduleMode("calendar-sync")}
-                      />
-                      <ModeCard
-                        title="Shop Availability"
-                        active={scheduleMode === "shop-availability"}
-                        onClick={() => setScheduleMode("shop-availability")}
-                      />
-                    </div>
+                    {isScheduleLoading ? (
+                      <div className="rounded-[16px] border border-blue-500/20 bg-blue-50 px-4 py-4 text-sm text-blue-800">
+                        <div className="flex items-center gap-2">
+                          <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-blue-700/25 border-t-blue-700" />
+                          our agent is finding available slots on your calendar
+                          and matching with available slots of the service center
+                        </div>
+                      </div>
+                    ) : (
+                      <>
+                        <div className="grid gap-3 sm:grid-cols-2">
+                          <ModeCard
+                            title="Calendar Sync"
+                            active={scheduleMode === "calendar-sync"}
+                            onClick={() => setScheduleMode("calendar-sync")}
+                          />
+                          <ModeCard
+                            title="Shop Availability"
+                            active={scheduleMode === "shop-availability"}
+                            onClick={() => setScheduleMode("shop-availability")}
+                          />
+                        </div>
 
-                    <p className="rounded-[12px] border border-blue-500/20 bg-blue-50 px-4 py-2 text-sm text-blue-800">
-                      These slots are based on current service team availability
-                      and your availability based on your calendar.
-                    </p>
+                        <p className="rounded-[12px] border border-blue-500/20 bg-blue-50 px-4 py-2 text-sm text-blue-800">
+                          These slots are based on current service team
+                          availability and your availability based on your
+                          calendar.
+                        </p>
 
-                    <div className="space-y-3">
-                      {serviceSlots.map((slot) => {
-                        const active = slot.id === selectedSlotId;
-                        const isPreferred = slot.mechanic === preferredSupport.mechanic;
-                        return (
-                          <button
-                            key={slot.id}
-                            type="button"
-                            onClick={() => setSelectedSlotId(slot.id)}
-                            className={`w-full rounded-[16px] border px-4 py-3 text-left transition ${
-                              active
-                                ? "border-blue-500 bg-blue-50"
-                                : "border-black/10 bg-white hover:border-blue-500"
-                            } ${isPreferred ? "border-2 border-black font-semibold" : ""}`}
-                          >
-                            <div className="flex items-center justify-between gap-3">
-                              <p className="text-base text-black">{slot.mechanic}</p>
-                              {isPreferred && (
-                                <span className="rounded-full bg-black px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-white">
-                                  Your preferred support
-                                </span>
-                              )}
-                            </div>
-                            <p className="mt-1 text-sm text-black/75">
-                              Primary: {slot.primary}
-                            </p>
-                            <p className="mt-1 text-xs text-black/55">
-                              Alternate slots: {slot.alternates.join(" • ")}
-                            </p>
-                          </button>
-                        );
-                      })}
-                    </div>
+                        <div className="space-y-3">
+                          {serviceSlots.map((slot) => {
+                            const active = slot.id === selectedSlotId;
+                            const isPreferred =
+                              slot.mechanic === preferredSupport.mechanic;
+                            return (
+                              <button
+                                key={slot.id}
+                                type="button"
+                                onClick={() => setSelectedSlotId(slot.id)}
+                                className={`w-full rounded-[16px] border px-4 py-3 text-left transition ${
+                                  active
+                                    ? "border-blue-500 bg-blue-50"
+                                    : "border-black/10 bg-white hover:border-blue-500"
+                                } ${isPreferred ? "border-2 border-black font-semibold" : ""}`}
+                              >
+                                <div className="flex items-center justify-between gap-3">
+                                  <p className="text-base text-black">
+                                    {slot.mechanic}
+                                  </p>
+                                  {isPreferred && (
+                                    <span className="rounded-full bg-black px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-white">
+                                      Your preferred support
+                                    </span>
+                                  )}
+                                </div>
+                                <p className="mt-1 text-sm text-black/75">
+                                  Primary: {slot.primary}
+                                </p>
+                                <p className="mt-1 text-xs text-black/55">
+                                  Alternate slots: {slot.alternates.join(" • ")}
+                                </p>
+                              </button>
+                            );
+                          })}
+                        </div>
 
-                    <PrimaryButton onClick={confirmAppointment}>
-                      Confirm Appointment
-                    </PrimaryButton>
+                        <PrimaryButton onClick={confirmAppointment}>
+                          Confirm Appointment
+                        </PrimaryButton>
+                      </>
+                    )}
                   </div>
                 )}
               </div>
