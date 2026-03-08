@@ -5,6 +5,7 @@ import { useMemo, useState, type FormEvent, type ReactNode } from "react";
 type UserRole = "customer" | "mechanic";
 type CustomerTab = "estimate" | "schedule";
 type ServiceTab = "pipeline" | "kpi";
+type PipelineView = "list" | "detail";
 type EstimateStatus = "draft" | "generated" | "approved";
 type ScheduleMode = "calendar-sync" | "shop-availability";
 type ChatRole = "user" | "assistant";
@@ -57,7 +58,7 @@ const serviceTabs: { id: ServiceTab; label: string }[] = [
 const jobs: Job[] = [
   {
     id: "AG-2038",
-    customer: "Maya Thompson",
+    customer: "Kyle Thompson",
     vehicle: "2019 Toyota RAV4 XLE",
     issue: "Front bumper scrape and brake pull",
     status: "Scheduled",
@@ -168,14 +169,17 @@ export default function Home() {
   const [password, setPassword] = useState("");
   const [loginError, setLoginError] = useState("");
   const [isMechanicRevealLoading, setIsMechanicRevealLoading] = useState(false);
+  const [isCustomerRevealLoading, setIsCustomerRevealLoading] = useState(false);
   const [activeCustomerTab, setActiveCustomerTab] =
     useState<CustomerTab>("estimate");
   const [activeServiceTab, setActiveServiceTab] = useState<ServiceTab>("pipeline");
+  const [pipelineView, setPipelineView] = useState<PipelineView>("list");
   const [estimateStatus, setEstimateStatus] = useState<EstimateStatus>("draft");
   const [isGeneratingEstimate, setIsGeneratingEstimate] = useState(false);
   const [scheduleMode, setScheduleMode] =
     useState<ScheduleMode>("calendar-sync");
   const [isScheduleLoading, setIsScheduleLoading] = useState(false);
+  const [showScheduleConfirmation, setShowScheduleConfirmation] = useState(false);
   const [selectedSlotId, setSelectedSlotId] = useState(serviceSlots[0].id);
   const [uploadedPhotos, setUploadedPhotos] = useState<File[]>([]);
   const [selectedJobId, setSelectedJobId] = useState(jobs[0].id);
@@ -185,7 +189,7 @@ export default function Home() {
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>(starterChat);
   const [isReplying, setIsReplying] = useState(false);
   const [ticket, setTicket] = useState({
-    customer: "Maya Thompson",
+    customer: "Kyle Thompson",
     vehicle: "2019 Toyota RAV4 XLE",
     mileage: "58,240",
     symptoms: "Front bumper scrape, slight brake pull, dashboard warning.",
@@ -206,7 +210,7 @@ export default function Home() {
     setIsScheduleLoading(true);
     window.setTimeout(() => {
       setIsScheduleLoading(false);
-    }, 1600);
+    }, 3500);
   }
 
   function runResearchFlow() {
@@ -215,7 +219,7 @@ export default function Home() {
     window.setTimeout(() => {
       setIsResearching(false);
       setShowResearchSummary(true);
-    }, 2300);
+    }, 10000);
   }
 
   function signIn(event: FormEvent<HTMLFormElement>) {
@@ -240,11 +244,15 @@ export default function Home() {
       setIsMechanicRevealLoading(true);
       window.setTimeout(() => {
         setIsMechanicRevealLoading(false);
-      }, 1500);
-      runResearchFlow();
+      }, 3200);
+      setPipelineView("list");
     }
 
     if (nextRole === "customer") {
+      setIsCustomerRevealLoading(true);
+      window.setTimeout(() => {
+        setIsCustomerRevealLoading(false);
+      }, 3200);
       setActiveCustomerTab("estimate");
     }
   }
@@ -257,25 +265,32 @@ export default function Home() {
     window.setTimeout(() => {
       setEstimateStatus("generated");
       setIsGeneratingEstimate(false);
-    }, 1600);
+    }, 3500);
   }
 
   function approveEstimate() {
     setEstimateStatus("approved");
     setActiveCustomerTab("schedule");
+    setShowScheduleConfirmation(false);
     startScheduleLoading();
   }
 
   function confirmAppointment() {
     setEstimateStatus("approved");
+    setShowScheduleConfirmation(true);
   }
 
   function selectJob(jobId: string) {
     setSelectedJobId(jobId);
+    setPipelineView("detail");
     setChatMessages(starterChat);
     setChatInput("");
     setIsReplying(false);
     runResearchFlow();
+  }
+
+  function goBackToPipeline() {
+    setPipelineView("list");
   }
 
   function sendChat() {
@@ -299,7 +314,7 @@ export default function Home() {
         },
       ]);
       setIsReplying(false);
-    }, 700);
+    }, 1500);
   }
 
   if (!isLoggedIn) {
@@ -365,6 +380,26 @@ export default function Home() {
     );
   }
 
+  if (userRole === "customer" && isCustomerRevealLoading) {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-white px-4 py-8 text-black">
+        <section className="w-full max-w-2xl rounded-[24px] border border-blue-500/20 bg-blue-50 p-7">
+          <p className="text-xs uppercase tracking-[0.2em] text-blue-700">
+            Customer Portal
+          </p>
+          <h1 className="mt-2 text-3xl font-semibold">Hey Kyle, Welcome back</h1>
+          <p className="mt-2 text-sm text-blue-900/80">
+            Your agent is ready to generate your estimate and appointment options.
+          </p>
+          <div className="mt-4 flex items-center gap-2 text-sm text-blue-800">
+            <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-blue-700/25 border-t-blue-700" />
+            Preparing your customer workspace...
+          </div>
+        </section>
+      </main>
+    );
+  }
+
   return (
     <main className="min-h-screen bg-white px-4 py-5 text-black sm:px-6 lg:px-8">
       <div className="mx-auto flex max-w-7xl flex-col gap-5">
@@ -392,7 +427,10 @@ export default function Home() {
                       active={activeCustomerTab === tab.id}
                       onClick={() => {
                         setActiveCustomerTab(tab.id);
-                        if (tab.id === "schedule") startScheduleLoading();
+                        if (tab.id === "schedule") {
+                          setShowScheduleConfirmation(false);
+                          startScheduleLoading();
+                        }
                       }}
                     />
                   ))}
@@ -491,6 +529,11 @@ export default function Home() {
                           and matching with available slots of the service center
                         </div>
                       </div>
+                    ) : showScheduleConfirmation ? (
+                      <div className="rounded-[16px] border border-emerald-400/30 bg-emerald-50 px-4 py-4 text-sm text-emerald-900">
+                        the rule-based engine will schedule this meeting,
+                        looking forward to it!
+                      </div>
                     ) : (
                       <>
                         <div className="grid gap-3 sm:grid-cols-2">
@@ -576,7 +619,7 @@ export default function Home() {
         )}
 
         {userRole === "mechanic" && (
-          <section className="grid gap-5 lg:grid-cols-[1.25fr_0.75fr]">
+          <section>
             <div className="rounded-[24px] border border-black/10 bg-white p-6">
               <div className="space-y-5">
                 <div className="rounded-[16px] border border-blue-500/20 bg-blue-50 px-4 py-3">
@@ -591,44 +634,58 @@ export default function Home() {
                       key={tab.id}
                       label={tab.label}
                       active={activeServiceTab === tab.id}
-                      onClick={() => setActiveServiceTab(tab.id)}
+                      onClick={() => {
+                        setActiveServiceTab(tab.id);
+                        if (tab.id === "pipeline") {
+                          setPipelineView("list");
+                        }
+                      }}
                     />
                   ))}
                 </div>
 
                 {activeServiceTab === "pipeline" && (
                   <div className="space-y-4">
-                    <SectionTitle title="Service Pipeline" />
-                    <div className="grid gap-4 xl:grid-cols-[0.8fr_1.2fr]">
-                      <div className="space-y-2">
-                        {jobs.map((job) => {
-                          const active = selectedJobId === job.id;
-                          return (
+                    {pipelineView === "list" ? (
+                      <>
+                        <SectionTitle title="Service Pipeline" />
+                        <p className="text-sm text-black/60">
+                          Select a customer to open the dedicated analysis page.
+                        </p>
+                        <div className="space-y-2">
+                          {jobs.map((job) => (
                             <button
                               key={job.id}
                               type="button"
                               onClick={() => selectJob(job.id)}
-                              className={`w-full rounded-[14px] border px-4 py-3 text-left transition ${
-                                active
-                                  ? "border-blue-500 bg-blue-50"
-                                  : "border-black/10 bg-white hover:border-blue-500"
-                              }`}
+                              className="w-full rounded-[14px] border border-black/10 bg-white px-4 py-3 text-left transition hover:border-blue-500"
                             >
-                              <p className="text-sm font-semibold text-black">
-                                {job.id} · {job.customer}
-                              </p>
+                              <div className="flex items-center justify-between gap-2">
+                                <p className="text-sm font-semibold text-black">
+                                  {job.id} · {job.customer}
+                                </p>
+                                <StatusPill status={job.status} />
+                              </div>
                               <p className="text-sm text-black/70">{job.vehicle}</p>
                               <p className="text-xs text-black/50">
                                 {job.issue} · {job.eta}
                               </p>
                             </button>
-                          );
-                        })}
-                      </div>
+                          ))}
+                        </div>
+                      </>
+                    ) : (
+                      <div className="space-y-4 rounded-[18px] border border-black/10 bg-white p-4">
+                        <button
+                          type="button"
+                          onClick={goBackToPipeline}
+                          className="rounded-full border border-black/20 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.1em] text-black hover:border-blue-500 hover:text-blue-700"
+                        >
+                          Back to pipeline
+                        </button>
 
-                      <div className="space-y-3 rounded-[18px] border border-black/10 bg-white p-4">
                         <div className="flex items-center justify-between gap-2">
-                          <p className="text-sm font-semibold text-black">
+                          <p className="text-base font-semibold text-black">
                             {selectedJob.id} · {selectedJob.customer}
                           </p>
                           <StatusPill status={selectedJob.status} />
@@ -687,8 +744,9 @@ export default function Home() {
                           {isResearching ? (
                             <div className="flex items-center gap-2">
                               <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-blue-700/25 border-t-blue-700" />
-                              your agent is researching car history and also
-                              public information on anything you need to know
+                              Your agentis researching on the history and
+                              similar issues globally and will report back for
+                              10 seconds
                             </div>
                           ) : (
                             <p className="font-semibold">
@@ -700,7 +758,7 @@ export default function Home() {
                         {showResearchSummary && (
                           <div className="space-y-2 rounded-[14px] border border-black/10 bg-white px-4 py-3 text-sm">
                             <p className="font-semibold text-black">
-                              Agent Summary
+                              Analysis Summary
                             </p>
                             <p className="text-black/75">
                               <span className="font-semibold">
@@ -723,7 +781,7 @@ export default function Home() {
                           </div>
                         )}
                       </div>
-                    </div>
+                    )}
                   </div>
                 )}
 
@@ -740,19 +798,6 @@ export default function Home() {
               </div>
             </div>
 
-            <aside className="space-y-4">
-              <div className="rounded-[24px] border border-black/10 bg-white p-5">
-                <p className="text-xs uppercase tracking-[0.18em] text-black/45">
-                  Mechanic Snapshot
-                </p>
-                <div className="mt-3 space-y-2">
-                  <MiniStat label="Next customer" value={selectedJob.customer} />
-                  <MiniStat label="Vehicle" value={selectedJob.vehicle} />
-                  <MiniStat label="Status" value={selectedJob.status} />
-                  <MiniStat label="ETA" value={selectedJob.eta} />
-                </div>
-              </div>
-            </aside>
           </section>
         )}
       </div>
