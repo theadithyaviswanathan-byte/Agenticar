@@ -86,11 +86,11 @@ export default function Home() {
   const [chatInput, setChatInput] = useState("");
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>(starterChat);
   const [isReplying, setIsReplying] = useState(false);
+  const [uploadedPhotos, setUploadedPhotos] = useState<File[]>([]);
   const [ticket, setTicket] = useState({
     customer: "Maya Thompson",
     vehicle: "2019 Toyota RAV4 XLE",
     mileage: "58,240",
-    photos: "4",
     symptoms: "Front bumper scrape, slight brake pull, dashboard warning.",
   });
 
@@ -207,14 +207,38 @@ export default function Home() {
                       setTicket((current) => ({ ...current, mileage: value }))
                     }
                   />
-                  <Field
-                    label="Photos"
-                    value={ticket.photos}
-                    onChange={(value) =>
-                      setTicket((current) => ({ ...current, photos: value }))
-                    }
-                  />
                 </div>
+
+                <label className="block">
+                  <span className="mb-1 block text-sm text-black/65">Photos</span>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    onChange={(event) => {
+                      const files = event.target.files;
+                      setUploadedPhotos(files ? Array.from(files) : []);
+                    }}
+                    className="w-full rounded-[10px] border border-black/15 bg-white px-3 py-2 text-sm outline-none file:mr-3 file:rounded-full file:border-0 file:bg-black file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-white hover:file:bg-blue-600 focus:border-blue-500"
+                  />
+                  <p className="mt-2 text-xs text-black/55">
+                    {uploadedPhotos.length > 0
+                      ? `${uploadedPhotos.length} image${uploadedPhotos.length === 1 ? "" : "s"} selected`
+                      : "No images selected"}
+                  </p>
+                  {uploadedPhotos.length > 0 && (
+                    <ul className="mt-2 space-y-1 text-xs text-black/65">
+                      {uploadedPhotos.slice(0, 3).map((file) => (
+                        <li key={`${file.name}-${file.lastModified}`}>
+                          {file.name}
+                        </li>
+                      ))}
+                      {uploadedPhotos.length > 3 && (
+                        <li>+{uploadedPhotos.length - 3} more</li>
+                      )}
+                    </ul>
+                  )}
+                </label>
 
                 <Field
                   label="Symptoms"
