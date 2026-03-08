@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, type ReactNode } from "react";
+import { useMemo, useState, type FormEvent, type ReactNode } from "react";
 
 type TopTab = "customer" | "service";
 type CustomerTab = "estimate" | "schedule";
@@ -122,11 +122,16 @@ const kpiMetrics: KpiMetric[] = [
 ];
 
 export default function Home() {
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const [loginError, setLoginError] = useState("");
   const [activeTopTab, setActiveTopTab] = useState<TopTab>("customer");
   const [activeCustomerTab, setActiveCustomerTab] =
     useState<CustomerTab>("estimate");
   const [activeServiceTab, setActiveServiceTab] = useState<ServiceTab>("pipeline");
   const [estimateStatus, setEstimateStatus] = useState<EstimateStatus>("draft");
+  const [isGeneratingEstimate, setIsGeneratingEstimate] = useState(false);
   const [scheduleMode, setScheduleMode] =
     useState<ScheduleMode>("calendar-sync");
   const [selectedSlotId, setSelectedSlotId] = useState(serviceSlots[0].id);
@@ -148,8 +153,25 @@ export default function Home() {
   const selectedSlot =
     serviceSlots.find((slot) => slot.id === selectedSlotId) ?? serviceSlots[0];
 
+  function signIn(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!username.trim() || !password.trim()) {
+      setLoginError("Enter any username and password to continue.");
+      return;
+    }
+    setLoginError("");
+    setIsLoggedIn(true);
+  }
+
   function generateEstimate() {
-    setEstimateStatus("generated");
+    if (isGeneratingEstimate) return;
+    setIsGeneratingEstimate(true);
+    setEstimateStatus("draft");
+
+    window.setTimeout(() => {
+      setEstimateStatus("generated");
+      setIsGeneratingEstimate(false);
+    }, 1600);
   }
 
   function approveEstimate() {
@@ -160,6 +182,48 @@ export default function Home() {
   function confirmAppointment() {
     setActiveTopTab("service");
     setActiveServiceTab("pipeline");
+  }
+
+  if (!isLoggedIn) {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-white px-4 py-8 text-black">
+        <section className="w-full max-w-md rounded-[24px] border border-black/10 bg-white p-6 sm:p-7">
+          <p className="text-xs uppercase tracking-[0.22em] text-blue-700">
+            Agenticar Services
+          </p>
+          <h1 className="mt-2 text-3xl font-semibold leading-tight">Sign in</h1>
+          <p className="mt-2 text-sm text-black/65">
+            Enter any username and password to continue.
+          </p>
+          <form onSubmit={signIn} className="mt-5 space-y-4">
+            <label className="block">
+              <span className="mb-1 block text-sm text-black/65">Username</span>
+              <input
+                value={username}
+                onChange={(event) => setUsername(event.target.value)}
+                className="w-full rounded-[10px] border border-black/15 bg-white px-3 py-2 text-sm outline-none focus:border-blue-500"
+              />
+            </label>
+            <label className="block">
+              <span className="mb-1 block text-sm text-black/65">Password</span>
+              <input
+                type="password"
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+                className="w-full rounded-[10px] border border-black/15 bg-white px-3 py-2 text-sm outline-none focus:border-blue-500"
+              />
+            </label>
+            {loginError && <p className="text-sm text-red-600">{loginError}</p>}
+            <button
+              type="submit"
+              className="w-full rounded-full bg-black px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-600"
+            >
+              Sign In
+            </button>
+          </form>
+        </section>
+      </main>
+    );
   }
 
   return (
@@ -264,15 +328,23 @@ export default function Home() {
                       }
                     />
 
-                    <EstimateCard estimateStatus={estimateStatus} />
+                    <EstimateCard
+                      estimateStatus={estimateStatus}
+                      isGeneratingEstimate={isGeneratingEstimate}
+                    />
 
                     <div className="flex flex-wrap gap-2">
-                      <PrimaryButton onClick={generateEstimate}>
+                      <PrimaryButton
+                        onClick={generateEstimate}
+                        disabled={isGeneratingEstimate}
+                      >
                         Generate Estimate
                       </PrimaryButton>
                       <SecondaryButton
                         onClick={approveEstimate}
-                        disabled={estimateStatus !== "generated"}
+                        disabled={
+                          estimateStatus !== "generated" || isGeneratingEstimate
+                        }
                       >
                         Approve & Continue
                       </SecondaryButton>
@@ -298,7 +370,8 @@ export default function Home() {
                     </div>
 
                     <p className="rounded-[12px] border border-blue-500/20 bg-blue-50 px-4 py-2 text-sm text-blue-800">
-                      These slots are based on current service team availability.
+                      These slots are based on current service team availability
+                      and your availability based on your calendar.
                     </p>
 
                     <div className="space-y-3">
@@ -481,10 +554,23 @@ function Field({
   );
 }
 
-function EstimateCard({ estimateStatus }: { estimateStatus: EstimateStatus }) {
+function EstimateCard({
+  estimateStatus,
+  isGeneratingEstimate,
+}: {
+  estimateStatus: EstimateStatus;
+  isGeneratingEstimate: boolean;
+}) {
   return (
     <div className="rounded-[18px] border border-blue-500/20 bg-blue-50 p-4">
       <p className="text-xs uppercase tracking-[0.16em] text-blue-700">Estimate</p>
+      {isGeneratingEstimate && (
+        <div className="mt-2 flex items-center gap-2 rounded-[10px] border border-blue-500/20 bg-white px-3 py-2 text-sm text-blue-800">
+          <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-blue-700/25 border-t-blue-700" />
+          our machine learning model is running to generate the best price
+          estimate
+        </div>
+      )}
       <p className="mt-1 text-3xl font-semibold text-black">
         {estimateStatus === "draft" ? "--" : "$1,005"}
       </p>
@@ -508,15 +594,22 @@ function EstimateCard({ estimateStatus }: { estimateStatus: EstimateStatus }) {
 function PrimaryButton({
   children,
   onClick,
+  disabled,
 }: {
   children: ReactNode;
   onClick: () => void;
+  disabled?: boolean;
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
-      className="rounded-full bg-black px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-600"
+      disabled={disabled}
+      className={`rounded-full px-4 py-2.5 text-sm font-semibold text-white transition ${
+        disabled
+          ? "cursor-not-allowed bg-black/35"
+          : "bg-black hover:bg-blue-600"
+      }`}
     >
       {children}
     </button>
