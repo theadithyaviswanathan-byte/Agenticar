@@ -7,6 +7,7 @@ type CustomerTab = "estimate" | "schedule";
 type ServiceTab = "pipeline" | "kpi";
 type PipelineView = "list" | "detail";
 type EstimateStatus = "draft" | "generated" | "approved";
+type EstimateLoaderStep = "severity" | "pricing";
 type ScheduleMode = "calendar-sync" | "shop-availability";
 type ChatRole = "user" | "assistant";
 
@@ -176,6 +177,8 @@ export default function Home() {
   const [pipelineView, setPipelineView] = useState<PipelineView>("list");
   const [estimateStatus, setEstimateStatus] = useState<EstimateStatus>("draft");
   const [isGeneratingEstimate, setIsGeneratingEstimate] = useState(false);
+  const [estimateLoaderStep, setEstimateLoaderStep] =
+    useState<EstimateLoaderStep>("severity");
   const [scheduleMode, setScheduleMode] =
     useState<ScheduleMode>("calendar-sync");
   const [isScheduleLoading, setIsScheduleLoading] = useState(false);
@@ -261,11 +264,16 @@ export default function Home() {
     if (isGeneratingEstimate) return;
     setIsGeneratingEstimate(true);
     setEstimateStatus("draft");
+    setEstimateLoaderStep("severity");
+
+    window.setTimeout(() => {
+      setEstimateLoaderStep("pricing");
+    }, 8000);
 
     window.setTimeout(() => {
       setEstimateStatus("generated");
       setIsGeneratingEstimate(false);
-    }, 3500);
+    }, 16000);
   }
 
   function approveEstimate() {
@@ -496,6 +504,7 @@ export default function Home() {
                     <EstimateCard
                       estimateStatus={estimateStatus}
                       isGeneratingEstimate={isGeneratingEstimate}
+                      estimateLoaderStep={estimateLoaderStep}
                     />
 
                     <div className="flex flex-wrap gap-2">
@@ -871,9 +880,11 @@ function Field({
 function EstimateCard({
   estimateStatus,
   isGeneratingEstimate,
+  estimateLoaderStep,
 }: {
   estimateStatus: EstimateStatus;
   isGeneratingEstimate: boolean;
+  estimateLoaderStep: EstimateLoaderStep;
 }) {
   return (
     <div className="rounded-[18px] border border-blue-500/20 bg-blue-50 p-4">
@@ -881,8 +892,9 @@ function EstimateCard({
       {isGeneratingEstimate && (
         <div className="mt-2 flex items-center gap-2 rounded-[10px] border border-blue-500/20 bg-white px-3 py-2 text-sm text-blue-800">
           <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-blue-700/25 border-t-blue-700" />
-          our machine learning model is running to generate the best price
-          estimate
+          {estimateLoaderStep === "severity"
+            ? "Our machine learning model is identifying the severity of the damage"
+            : "Our Pricing agent is leveraging our pricing model along with the severity score and market data research to identify an optimal price"}
         </div>
       )}
       <p className="mt-1 text-3xl font-semibold text-black">
